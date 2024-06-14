@@ -1,0 +1,51 @@
+embed-server --server-config=standalone-full.xml --std-out=echo
+
+set CASUAL_VERSION=${env.CASUAL_VERSION}
+set CASUAL_CALLER_VERSION=${env.CASUAL_CALLER_VERSION}
+set CASUAL_ROOT=${env.CASUAL_ROOT}
+set CASUAL_DOMAIN_NAME=${env.CASUAL_DOMAIN_NAME}
+set CASUAL_HOST=${env.CASUAL_HOST}
+set CASUAL_PORT=${env.CASUAL_PORT}
+
+# delete ExampleDS
+/subsystem=datasources/data-source=ExampleDS:remove()
+/subsystem=ee/service=default-bindings:write-attribute(name=datasource,value=undefined)
+
+# Global module
+/subsystem=ee:list-add(name=global-modules, value={name=se.laz.casual})
+
+# Unique transaction node identifier 
+/system-property=jboss.tx.node.id:add(value='wildfly-only')
+
+# configure casual RA
+set baseNode=/subsystem=resource-adapters/resource-adapter=casual-jca
+$baseNode:add(archive=casual-jca-app-$CASUAL_VERSION.ear#casual-jca.rar,transaction-support=XATransaction)
+
+set connectionDefinitionNode=$baseNode/connection-definitions=casual-pool
+$connectionDefinitionNode:add(\
+    class-name=se.laz.casual.jca.CasualManagedConnectionFactory,\
+    jndi-name=eis/casualConnectionFactoryDefault,\
+    min-pool-size=100, initial-pool-size=100, max-pool-size=100,\
+    enabled=true,background-validation=false,validate-on-match=false)
+
+$connectionDefinitionNode/config-properties=HostName:add(value=$CASUAL_HOST)
+$connectionDefinitionNode/config-properties=PortNumber:add(value=$CASUAL_PORT)
+$connectionDefinitionNode/config-properties=NetworkConnectionPoolName:add(value=pool-one)
+$connectionDefinitionNode/config-properties=NetworkConnectionPoolSize:add(value=1)
+
+deploy $CASUAL_ROOT/casual-jca-app-$CASUAL_VERSION.ear
+deploy $CASUAL_ROOT/casual-caller-app-$CASUAL_CALLER_VERSION.ear
+deploy $CASUAL_ROOT/casual-inbound-startup-trigger-app-$CASUAL_VERSION.ear
+
+# configure test application datasource
+data-source add --name=order --driver-name=h2 --enabled=true --jndi-name=java:jboss/datasources/order --connection-url=jdbc:h2:mem:order;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=false --user-name=sa --password=sa --use-java-context=true --statistics-enabled=${wildfly.datasources.statistics-enabled:${wildfly.statistics-enabled:false}}
+
+# logging
+#/subsystem=logging/root-logger=ROOT:change-root-log-level(level=ALL)
+
+#/subsystem=logging/logger=io.netty:add(level=ALL)
+#/subsystem=logging/logger=se.laz.casual:add(level=ALL)
+#/subsystem=logging/logger=se.laz.casual.connection.caller:add(level=ALL)
+#/subsystem=logging/logger=se.laz.casual.jca:add(level=TRACE)
+
+stop-embedded-server

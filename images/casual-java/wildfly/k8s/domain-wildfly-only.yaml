@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wildfly-only
+  labels:
+    app: wildfly-only
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wildfly-only
+  template:
+    metadata:
+      labels:
+        app: wildfly-only
+    spec:
+      containers:
+      - name: wildfly
+        image: wildfly-casual-java-test-application:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 7772
+        - containerPort: 9990
+        - containerPort: 8080
+        - containerPort: 8787
+        - containerPort: 7698          
+        env:
+          - name: JAVA_TOOL_OPTIONS
+            value:
+          - name: JAVA_OPTS
+            value: -Xms1024m -Xmx1024m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/wildfly-latest-heap-dump-1024m.hprof
+          - name: JAVA_FORWARD_SERVICE_NAME
+            value: javaEcho
+          - name: CASUAL_NETWORK_OUTBOUND_ENABLE_LOGHANDLER
+            value: 'true'
+          - name: CASUAL_NETWORK_INBOUND_ENABLE_LOGHANDLER
+            value: 'true'
+          - name: CASUAL_JAVA_TEST_WORK_TIME
+            value: '1000'
+          - name: CASUAL_JAVA_TEST_SLEEP_TIME
+            value: '500'
